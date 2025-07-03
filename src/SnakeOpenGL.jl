@@ -1,13 +1,14 @@
 module SnakeOpenGL
 export runsnakegame
 using ModernGL, GLFW, Images, LinearAlgebra
+using MeshIO, GeometryBasics
 using Dates
 
 include(joinpath(@__DIR__, "opengl-abstractions.jl"))
 include(joinpath(@__DIR__, "opengl-math.jl"))
 function runsnakegame()
     # snake game constants
-    GAME_ROWS, GAME_COLS = 15, 17
+    GAME_ROWS, GAME_COLS = 8, 8
 
     # open gl & related constants
     GROUND_TEXTURE_WIDTH, GROUND_TEXTURE_HEIGHT = 0.5, 0.5
@@ -37,12 +38,25 @@ function runsnakegame()
     groundElements = vcat(
                           Vector{GLuint}[[f(row, col), f(row +1, col), f(row, col+1)] for row in 0:(GAME_ROWS-1) for col in 0:(GAME_COLS-1)], 
                           Vector{GLuint}[[f(row+1, col), f(row +1, col+1), f(row, col+1)] for row in 0:(GAME_ROWS-1) for col in 0:(GAME_COLS-1)] )
-
+    
     groundVAO, groundVBO = createvertexarrayobject(hcat(groundVertexPos, groundTextureCoors), prog, ["position", "texcoord"]; elements = groundElements)
 
     # create ground texture
     groundImg = loadimagefromfile(joinpath(@__DIR__, "assets", "ground-texture.jpg"))
     groundTex = createimagemipmap(groundImg, 0)
+
+    # create apple model
+    appleMesh = expand_faceviews(load(joinpath(@__DIR__, "assets", "apple.obj")))
+    appleVertexPos = Vector{Vector{GLfloat}}(appleMesh.vertex_attributes[:position])
+    appleTextureCoors = Vector{Vector{GLfloat}}(appleMesh.vertex_attributes[:uv])
+    appleElements = map(x -> Vector{GLuint}(x .-1), Vector{Vector{GLuint}}(appleMesh.faces)) 
+    appleVAO, appleVBO = createvertexarrayobject(hcat(appleVertexPos,appleTextureCoors), prog, ["position", "texcoord"]; elements =appleElements)
+
+    # create apple texture
+    appleImg = loadimagefromfile(joinpath(@__DIR__, "assets", "apple-diffuse.jpg"), true, true)
+    appleTex = createimagemipmap(appleImg, 1)
+
+    glEnable(GL_DEPTH_TEST)
 
     startTime = datetime2unix(now())
     # render loop
@@ -51,6 +65,8 @@ function runsnakegame()
             GLFW.SetWindowShouldClose(window, true)
         end
   
+        currentTime = datetime2unix(now())
+        elapsedTime = currentTime-startTime
         # clear background
         glClearColor(0.1, 0.1, 0.1, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -67,6 +83,12 @@ function runsnakegame()
         glUniform1i(texLoc, 0)
         glBindVertexArray(groundVAO[1])
         glDrawElements(GL_TRIANGLES, 3*length(groundElements), GL_UNSIGNED_INT, C_NULL)
+        # draw apple
+        model = translate(3.5, 1, 3.5)*rotate(-0.7, [1, 0, 0.])*rotate(elapsedTime, [0., 1., 0.])*scale(1/11*0.7)
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model)
+        glUniform1i(texLoc, 1)
+        glBindVertexArray(appleVAO[1])
+        glDrawElements(GL_TRIANGLES, 3*length(appleMesh.faces), GL_UNSIGNED_INT, C_NULL)
 
         GLFW.SwapBuffers(window)
         GLFW.PollEvents()

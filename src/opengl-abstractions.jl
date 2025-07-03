@@ -96,10 +96,17 @@ function createfloatvertexattributepointers(shaderProgram::UInt32, attributes::V
         total += atSize
     end
 end
-function loadimagefromfile(filename::String)
-    return permutedims(load(filename))[end:-1:1, :]
+function loadimagefromfile(filename::String, flipHorizontal::Bool = false, flipVertical::Bool=false)
+    img = permutedims(load(filename))[end:-1:1, :]
+    if flipVertical
+        img = img[end:-1:1, :]
+    end
+    if flipHorizontal
+        img = img[:, end:-1:1]
+    end
+    return img
 end
-function createimagemipmap(image::Union{Matrix{RGB{N0f8}}, Matrix{RGBA{N0f8}}}, textureUnit::Int ; wrapS::UInt32 = GL_REPEAT, wrapT::UInt32 = GL_REPEAT, minFilter::UInt32 = GL_LINEAR_MIPMAP_LINEAR, magFilter::UInt32 = GL_LINEAR)
+function createimagemipmap(image::Union{Matrix{RGB{N0f8}}, Matrix{RGBA{N0f8}}}, textureUnit::Int ; wrapS::UInt32 = GL_REPEAT, wrapT::UInt32 = GL_REPEAT, minFilter::UInt32 = GL_LINEAR_MIPMAP_LINEAR, magFilter::UInt32 = GL_LINEAR, flipHorizontal::Bool = false, flipVertical::Bool=false)
     height, width = size(image)
 
     tex = GLint[0]

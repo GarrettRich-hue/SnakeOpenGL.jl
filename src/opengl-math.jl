@@ -58,7 +58,7 @@ Return a rotation matrix that rotates about the given axis at the given angle.
 function rotate(angle::GLfloat, axis::Vector{GLfloat})
     return rotate(angle, axis[1], axis[2], axis[3])
 end
-function rotate(angle::Real, axis::Vector{Real})
+function rotate(angle::Real, axis::Vector{<:Real})
     return rotate(GLfloat(angle), GLfloat.(axis))
 end
 """
@@ -77,4 +77,11 @@ Return a scaling matrix that scales each axis by the corresponding component of 
 """
 function scale(codedVector::Vector{<: Real})
     return scale(codedVector[1], codedVector[2], codedVector[3])
+end
+"""
+    scale(scaleFactor)
+Return a scaling matrix that scales uniformly by the scaleFactor
+"""
+function scale(scaleFactor::Real)
+    return scale(scaleFactor, scaleFactor, scaleFactor)
 end
