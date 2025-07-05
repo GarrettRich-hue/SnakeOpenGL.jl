@@ -53,7 +53,7 @@ function runsnakegame()
     appleVAO, appleVBO = createvertexarrayobject(hcat(appleVertexPos,appleTextureCoors), prog, ["position", "texcoord"]; elements =appleElements)
 
     # create apple texture
-    appleImg = loadimagefromfile(joinpath(@__DIR__, "assets", "apple-diffuse.jpg"), true, true)
+    appleImg = loadimagefromfile(joinpath(@__DIR__, "assets", "apple-diffuse.jpg"),true, true)
     appleTex = createimagemipmap(appleImg, 1)
 
     glEnable(GL_DEPTH_TEST)
