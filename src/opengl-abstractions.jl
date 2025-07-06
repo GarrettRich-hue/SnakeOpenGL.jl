@@ -124,3 +124,11 @@ function createimagemipmap(image::Union{Matrix{RGB{N0f8}}, Matrix{RGBA{N0f8}}}, 
 
     return tex
 end
+function loadmeshfromfile(filename::String)
+    fMesh = expand_faceviews(load(filename))
+    fVertexPos = Vector{Vector{GLfloat}}(fMesh.vertex_attributes[:position])
+    fTextureCoors = Vector{Vector{GLfloat}}(fMesh.vertex_attributes[:uv])
+    fElements = map(x -> Vector{GLuint}(x .-1), Vector{Vector{GLuint}}(fMesh.faces)) 
+    return fVertexPos, fTextureCoors, fElements
+
+end
