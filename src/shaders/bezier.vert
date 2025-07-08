@@ -1,9 +1,12 @@
 #version 150
 
 in vec3 position;
-//in vec2 texcoord;
+in vec3 normal;
+in vec2 texcoord;
 
-//out vec2 Texcoord;
+out vec3 Normal;
+out vec2 Texcoord;
+out vec4 Pos;
 
 uniform vec3 p0;
 uniform vec3 p1;
@@ -33,11 +36,12 @@ void main()
     vec3 rightDir = normalize(cross(bezDir, vec3(0.0, 1.0, 0.0)));
     vec3 upDir = cross(rightDir, bezDir);
     float st = s1*t + s0*tm;
-    vec3 pos = bezPos + st*(rightDir * position.x + upDir * position.y);
-    gl_Position = proj*view*model*vec4(pos, 1.0);
-    //Texcoord = texcoord;
-    if(t > 1.01f || t< -0.01f){
-        gl_Position = vec4(0.f,0.f,0.f, 1.f);
-    }
+    mat4 bezTrans = mat4(vec4(rightDir*st, 0.0), vec4(upDir*st, 0.0), vec4(bezDir, 0.0), vec4(bezPos-position.z*bezDir, 1.0));
+    vec4 pos = bezTrans*vec4(position, 1.0);
+    gl_Position = proj*view*model*pos;
+    Pos = model*pos;
+    Normal = transpose(inverse(mat3(bezTrans*model))) * normal;
+
+    Texcoord = texcoord;
 }
 

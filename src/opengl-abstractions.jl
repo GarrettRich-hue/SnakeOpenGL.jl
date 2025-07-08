@@ -90,7 +90,10 @@ function createfloatvertexattributepointers(shaderProgram::UInt32, attributes::V
     total = 0
     for attr in attributes
         atName, atSize = attr
-        location = glGetAttribLocation(shaderProgram, atName) # should return 0 as we specified 0 to be the location in the vertex shader
+        location = glGetAttribLocation(shaderProgram, atName) 
+        if location == -1
+            @error "Could not find attribute location of \"$atName\""
+        end
         glVertexAttribPointer(location, atSize, GL_FLOAT, false, totalLength * sizeof(GLfloat), Ptr{Nothing}(total*sizeof(GLfloat)))
         glEnableVertexAttribArray(location)
         total += atSize
@@ -104,6 +107,8 @@ function loadimagefromfile(filename::String, flipHorizontal::Bool = false, flipV
     if flipHorizontal
         img = img[:, end:-1:1]
     end
+    # scale the image dimensions into powers of 2 if not already, this improves texture compatibility on different versions of open gl and on graphics cards
+    img = imresize(img, tuple([Int(round(2^ceil(log2(i)))) for i in size(img)]...)) 
     return img
 end
 function createimagemipmap(image::Union{Matrix{RGB{N0f8}}, Matrix{RGBA{N0f8}}}, textureUnit::Int ; wrapS::UInt32 = GL_REPEAT, wrapT::UInt32 = GL_REPEAT, minFilter::UInt32 = GL_LINEAR_MIPMAP_LINEAR, magFilter::UInt32 = GL_LINEAR, flipHorizontal::Bool = false, flipVertical::Bool=false)
@@ -127,8 +132,9 @@ end
 function loadmeshfromfile(filename::String)
     fMesh = expand_faceviews(load(filename))
     fVertexPos = Vector{Vector{GLfloat}}(fMesh.vertex_attributes[:position])
+    fNormals = Vector{Vector{GLfloat}}(fMesh.vertex_attributes[:normal])
     fTextureCoors = Vector{Vector{GLfloat}}(fMesh.vertex_attributes[:uv])
     fElements = map(x -> Vector{GLuint}(x .-1), Vector{Vector{GLuint}}(fMesh.faces)) 
-    return fVertexPos, fTextureCoors, fElements
+    return fVertexPos, fNormals, fTextureCoors, fElements
 
 end
