@@ -7,15 +7,14 @@ in vec4 Pos;
 out vec4 outColor;
 
 uniform sampler2D tex;
+uniform vec3 cameraPosition;
+uniform vec3 lightDirection;
+uniform vec4 diffuseLight;
+uniform vec4 ambientLight;
+uniform vec4 specularLight;
 
 void main()
 {
-    vec3 lightDirection = normalize(vec3(1.0, -2.0, -1.0));
-    vec4 diffuseLight = vec4(vec3(0.8), 1.0);
-    vec4 ambientLight = vec4(vec3(0.3),1.0);
-    vec4 specularLight = vec4(vec3(0.8), 1.0);
-
-    vec3 cameraPosition = vec3(4, 10.6568, 4);
 
     float shininess = 32;
 
@@ -24,7 +23,7 @@ void main()
 
     vec4 diffuse = max(0.0, dot(-lightDirection, norm)) * diffuseLight;
     vec4 ambient = ambientLight;
-    vec3 viewDirection = normalize(Pos.xyz - cameraPosition);
+    vec3 viewDirection = normalize((Pos).xyz);
     vec3 reflectDir = reflect(-lightDirection, norm);
     vec4 specular = pow(max(0.0, dot(viewDirection, reflectDir)), shininess) * specularLight;
     outColor = vec4(objectCol.rgb,1.0) * (ambient+diffuse)+ specular;
