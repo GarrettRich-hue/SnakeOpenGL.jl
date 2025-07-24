@@ -5,6 +5,7 @@ using MeshIO, GeometryBasics
 using Dates
 using DataStructures
 
+include(joinpath(@__DIR__, "bezier-curves.jl"))
 include(joinpath(@__DIR__, "opengl-abstractions.jl"))
 include(joinpath(@__DIR__, "opengl-math.jl"))
 function runsnakegame()
@@ -14,6 +15,7 @@ function runsnakegame()
 
     # snake game variables
     snakeQueue = CircularDeque{Int}(GAME_ROWS*GAME_COLS)#first element is tail, last element is head
+    deadTailPos = deadTailRow, deadTailCol = cld(GAME_ROWS,2), cld(GAME_COLS,2) + 3 # for ui, the space behind the tail which the snake used to be occupying
     squareidtorowcol(id::Int) = ((id) % GAME_ROWS+1, 1+div(id, GAME_ROWS))
     rowcoltosquareid(rowcol::Tuple{Int, Int}) = (first(rowcol)-1) + (last(rowcol)-1)*GAME_ROWS
 
@@ -68,6 +70,8 @@ function runsnakegame()
 
     # create shader program for models stretched by a bezier curve
     progBezier = createshaderprogram(joinpath(@__DIR__, "shaders/bezier.vert"), joinpath(@__DIR__, "shaders/model.frag"))
+    texStretchTLoc = glGetUniformLocation(progBezier, "texStretchT")
+    texStretchAxisTLoc = glGetUniformLocation(progBezier, "texStretchAxisT")
     p0Loc = glGetUniformLocation(progBezier, "p0")
     p1Loc = glGetUniformLocation(progBezier, "p1")
     d0Loc = glGetUniformLocation(progBezier, "d0")
@@ -130,6 +134,7 @@ function runsnakegame()
         end
         currentTime = datetime2unix(now()) - startTime
         elapsedTime = currentTime
+        movementInterTime = (elapsedTime/MOVEMENT_TIME) % 1 
         # game logic
         if ceil(prevElapsedTime/MOVEMENT_TIME) < elapsedTime/MOVEMENT_TIME
             # make movement 
@@ -139,6 +144,7 @@ function runsnakegame()
             if (newHeadRow, newHeadCol) == (appleRow, appleCol)
                 appleRow, appleCol = rand(1:GAME_ROWS), rand(1:GAME_COLS)
             else
+                deadTailPos = deadTailRow, deadTailCol = squareidtorowcol(snakeQueue[1])
                 popfirst!(snakeQueue)
             end
             
@@ -191,21 +197,48 @@ function runsnakegame()
         glUniform4f(diffuseLightLocBez, diffuseLight...)
         glUniform4f(ambientLightLocBez, ambientLight...)
         glUniform4f(specularLightLocBez, specularLight...)
+        function passbezier(bez::CubicBezier)
+            glUniform3f(p0Loc,GLfloat[bez.p0...]...) 
+            glUniform3f(d0Loc, GLfloat[(bez.p1-bez.p0)...]...)
+            glUniform3f(p1Loc,GLfloat[bez.p3...]...) 
+            glUniform3f(d1Loc, GLfloat[(bez.p3-bez.p2)...]...)
+        end
+        sizefunc(t) = GLfloat(0.7*t^(0.01+ 0.29*(length(snakeQueue)/(GAME_ROWS * GAME_COLS))))
         for (ind, snakePart) in enumerate(snakeQueue)
             pos = row, col = squareidtorowcol(snakePart)
-            nextpos = nextrow, nextcol = (ind != length(snakeQueue)) ? squareidtorowcol(snakeQueue[ind+1]) : (-1, -1)
-            prepos=prerow,precol = (ind != 1) ? squareidtorowcol(snakeQueue[ind-1]) : (row + row-nextrow, col + col-nextcol)
+            nextpos = nextrow, nextcol = (ind <= length(snakeQueue) - 1) ? squareidtorowcol(snakeQueue[ind+1]) : (-1, -1)
+            next2pos = next2row, next2col = (ind <= length(snakeQueue) - 2) ? squareidtorowcol(snakeQueue[ind+2]) : (-1, -1)
+            prepos=prerow,precol = (ind != 1) ? squareidtorowcol(snakeQueue[ind-1]) : deadTailPos
             if ind == length(snakeQueue)
-                nexpos = nextrow, nextcol = (row + row-prerow, col + col-precol)
+                nextpos = nextrow, nextcol = (row + snakeRowMove, col +snakeColMove)
+                next2pos = next2row, next2col =(row + 2*snakeRowMove, col +2*snakeColMove) 
+            elseif ind == length(snakeQueue) -1
+                next2pos = next2row, next2col =(nextrow + snakeRowMove, nextcol +snakeColMove)  
             end
-            glUniform3f(p0Loc, GLfloat[col+(precol-col)/2-0.5, 0.5, row+(prerow-row)/2-0.5]...)
-            glUniform3f(p1Loc, GLfloat[col+(nextcol-col)/2-0.5, 0.5, row+(nextrow-row)/2-0.5]...)
-            glUniform3f(d0Loc, GLfloat[-(precol-col)/2, 0.0, -(prerow-row)/2]...)
-            glUniform3f(d1Loc, GLfloat[(nextcol-col)/2, 0.0, (nextrow-row)/2]...)
-            glUniform1f(s0Loc, GLfloat(0.5))
-            glUniform1f(s1Loc, GLfloat(0.5))
+            bez = BezierDir(0.7*[col-0.5,0.5, row-0.5].+0.3*[(nextcol+precol)/2-0.5, 0.5, (nextrow+prerow)/2-0.5], 0.2.*[nextcol-precol,0, nextrow-prerow], 0.7*[nextcol-0.5,0.5, nextrow-0.5].+0.3*[(next2col+col)/2-0.5, 0.5, (next2row+row)/2-0.5], 0.2.*[next2col-col,0.0, next2row-row])
+            #bez = BezierDir([col+(precol-col)/2-0.5, 0.5, row+(prerow-row)/2-0.5],  [-(precol-col)/2, 0.0, -(prerow-row)/2], [col+(nextcol-col)/2-0.5, 0.5, row+(nextrow-row)/2-0.5], [(nextcol-col)/2, 0.0, (nextrow-row)/2])
+            if ind == length(snakeQueue) 
+                bez = splitbezier(bez,movementInterTime)[1]
+            elseif ind == 1
+                bez = splitbezier(bez, movementInterTime)[2]
+            end
+
+            passbezier(bez)
+            glUniform1f(s0Loc, sizefunc((ind-movementInterTime)/length(snakeQueue)))
+            glUniform1f(s1Loc, sizefunc((ind+1-movementInterTime)/length(snakeQueue)))
+            if ind == 1
+                glUniform1f(texStretchTLoc, GLfloat(1-movementInterTime)) 
+                glUniform1f(texStretchAxisTLoc, GLfloat(1.5))
+            elseif ind == length(snakeQueue)
+                glUniform1f(texStretchTLoc, GLfloat(movementInterTime)) 
+                glUniform1f(texStretchAxisTLoc, GLfloat(-0.5))
+            else
+                glUniform1f(texStretchTLoc, GLfloat(1.0)) 
+                glUniform1f(texStretchAxisTLoc, GLfloat(0.0))
+            end
             glDrawElements(GL_TRIANGLES, 3*length(snakeElements), GL_UNSIGNED_INT, C_NULL)
         end
+
 
         GLFW.SwapBuffers(window)
         GLFW.PollEvents()

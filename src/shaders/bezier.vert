@@ -8,6 +8,8 @@ out vec3 Normal;
 out vec2 Texcoord;
 out vec4 Pos;
 
+uniform float texStretchT;
+uniform float texStretchAxisT;
 uniform vec3 p0;
 uniform vec3 p1;
 uniform vec3 d0;
@@ -42,6 +44,6 @@ void main()
     Pos = model*pos;
     Normal = transpose(inverse(mat3(bezTrans*model))) * normal;
 
-    Texcoord = texcoord;
+    Texcoord = vec2(texcoord.s, texStretchAxisT+(texcoord.t-texStretchAxisT)*texStretchT);
 }
 
